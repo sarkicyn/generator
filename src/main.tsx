@@ -1,0 +1,56 @@
+import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./App";
+import "./index.css";
+import { installFrontendLogging } from "./lib/logger";
+
+// Check if this window was opened as a detached DevLog view
+const params = new URLSearchParams(window.location.search);
+const view = params.get("view");
+
+installFrontendLogging();
+
+// Native WebView menus are OS-owned surfaces; custom React context menus
+// still handle the event normally inside the protected webview.
+let presentationPrivacy = false;
+import("./lib/ipc").then(({ getStealthSupport }) => getStealthSupport()).then(support => { presentationPrivacy = support.enabled; }).catch(() => {});
+import("@tauri-apps/api/event").then(({ listen }) => {
+  listen<boolean>("stealth_mode_changed", event => { presentationPrivacy = event.payload; });
+});
+window.addEventListener("contextmenu", event => { if (presentationPrivacy) event.preventDefault(); });
+
+if (view === "meeting-prompt") {
+  // Meeting detection prompt: its own tiny root, none of the app's hooks
+  // (global shortcuts, config sync) run in this window.
+  import("./meeting-prompt/MeetingPrompt").then(({ MeetingPromptWindow }) => {
+    ReactDOM.createRoot(document.getElementById("root")!).render(
+      <React.StrictMode>
+        <MeetingPromptWindow />
+      </React.StrictMode>
+    );
+  });
+} else if (view === "devlog") {
+  // Render only the DevLog in this window — it subscribes to Tauri events
+  // independently and reads from the shared devLogStore.
+  import("./components/DevLogPanel").then(({ DevLogFullPage }) => {
+    // The detached window also needs its own event subscription
+    import("./hooks/useDevLog").then(({ useDevLog }) => {
+      // Wrapper component that runs the useDevLog hook
+      function DevLogWindow() {
+        useDevLog();
+        return <DevLogFullPage />;
+      }
+      ReactDOM.createRoot(document.getElementById("root")!).render(
+        <React.StrictMode>
+          <DevLogWindow />
+        </React.StrictMode>
+      );
+    });
+  });
+} else {
+  ReactDOM.createRoot(document.getElementById("root")!).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+}

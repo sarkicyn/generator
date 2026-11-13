@@ -1,0 +1,597 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Type scale: 4-step hierarchy ──
+   text-meta  = 10px  (labels, badges, timestamps, metadata)
+   text-xs    = 12px  (body text, descriptions, inputs)
+   text-sm    = 14px  (emphasis, nav items, toasts)
+   text-base+ = 16px+ (headings)
+*/
+@layer utilities {
+  .text-meta {
+    font-size: 0.625rem; /* 10px */
+    line-height: 1rem;   /* 16px */
+  }
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+    --card: 210 20% 98%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 20% 43%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 217 91% 60%;
+    --radius: 0.625rem;
+    --success: 160 84% 39%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 9%;
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 100%;
+    --highlight: 48 96% 53%;
+    --highlight-foreground: 0 0% 9%;
+    --speaker-user: 217 91% 60%;
+    --speaker-interviewer: 25 95% 53%;
+  }
+
+  .dark {
+    --background: 222 47% 6%;
+    --foreground: 210 20% 96%;
+    --card: 222 40% 8%;
+    --card-foreground: 210 20% 96%;
+    --popover: 222 40% 8%;
+    --popover-foreground: 210 20% 96%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 26% 14%;
+    --secondary-foreground: 210 20% 92%;
+    --muted: 220 20% 16%;
+    --muted-foreground: 215 14% 64%;
+    --accent: 220 26% 14%;
+    --accent-foreground: 210 20% 92%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 20% 18%;
+    --input: 220 20% 18%;
+    --ring: 217 91% 60%;
+    --success: 160 84% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 55%;
+    --warning-foreground: 0 0% 9%;
+    --info: 199 89% 53%;
+    --info-foreground: 0 0% 100%;
+    --highlight: 48 96% 60%;
+    --highlight-foreground: 0 0% 9%;
+    --speaker-user: 217 91% 60%;
+    --speaker-interviewer: 25 95% 53%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-feature-settings: "rlig" 1, "calt" 1, "liga" 1;
+    font-variant-numeric: tabular-nums;
+  }
+  code, pre, kbd, .font-mono {
+    font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', 'SF Mono', ui-monospace, monospace;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.2);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.35);
+}
+
+/* Overlay window transparent background — background + backdrop-filter applied inline */
+.overlay-bg {}
+
+/* Transcript interim text */
+.transcript-interim {
+  font-style: italic;
+  opacity: 0.6;
+}
+
+/* Subtle glow on primary elements */
+.glow-primary {
+  box-shadow: 0 0 12px -4px hsl(var(--primary) / 0.1),
+    0 0 4px -2px hsl(var(--primary) / 0.06);
+}
+
+/* Pulsing indicator animation */
+@keyframes question-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0.15);
+  }
+  50% {
+    box-shadow: 0 0 0 6px hsl(var(--primary) / 0);
+  }
+}
+
+.question-pulse {
+  animation: question-pulse 2s infinite;
+}
+
+/* Recording indicator */
+@keyframes rec-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.rec-indicator {
+  animation: rec-blink 1s infinite;
+}
+
+/* Disable text selection on drag areas */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ─── Living Transcript: spring-physics entry ─── */
+@keyframes transcript-enter {
+  0% {
+    transform: translateY(6px);
+    opacity: 0;
+  }
+  60% {
+    transform: translateY(-1px);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.transcript-line-enter {
+  animation: transcript-enter 350ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+
+/* Audio level bar: spring-like transition */
+.audio-bar-spring {
+  transition: width 250ms cubic-bezier(0.34, 1.3, 0.64, 1),
+              opacity 200ms ease-out;
+}
+
+/* ─── Question detector: attention entrance ─── */
+@keyframes question-enter {
+  0% {
+    transform: translateY(4px) scale(0.98);
+    opacity: 0;
+  }
+  70% {
+    transform: translateY(-1px) scale(1.005);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.question-card-enter {
+  animation: question-enter 400ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ─── Slide-down entrance for inputs/panels ─── */
+@keyframes slide-down-enter {
+  0% {
+    transform: translateY(-4px);
+    opacity: 0;
+    max-height: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+    max-height: 100px;
+  }
+}
+
+.slide-down-enter {
+  animation: slide-down-enter 250ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  overflow: hidden;
+}
+
+/* ─── Fade-in-up for floating buttons ─── */
+@keyframes fade-in-up {
+  0% {
+    transform: translateY(4px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.fade-in-up {
+  animation: fade-in-up 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Toast slide-in animation */
+@keyframes slide-in-from-right {
+  0% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Fade in animation */
+@keyframes fade-in {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* Slide up animation */
+@keyframes slide-up {
+  0% { transform: translateY(8px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+.animate-in {
+  animation-duration: 300ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  animation-fill-mode: both;
+}
+
+.fade-in {
+  animation-name: fade-in;
+}
+
+.slide-in-from-right {
+  animation-name: slide-in-from-right;
+}
+
+.slide-up {
+  animation-name: slide-up;
+}
+
+/* ── Toast spring entrance ── */
+@keyframes toast-spring-in {
+  0% {
+    transform: translateX(120%) scale(0.92);
+    opacity: 0;
+  }
+  65% {
+    transform: translateX(-3%) scale(1.01);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.toast-enter {
+  animation: toast-spring-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Toast exit ── */
+@keyframes toast-slide-out {
+  0% {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(110%) scale(0.92);
+    opacity: 0;
+  }
+}
+
+.toast-exit {
+  animation: toast-slide-out 280ms cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+
+/* ── Toast auto-dismiss progress bar ── */
+@keyframes toast-progress-shrink {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+.toast-progress-bar {
+  transform-origin: left;
+  animation: toast-progress-shrink 4000ms linear both;
+}
+
+/* ── Toast icon success pop ── */
+@keyframes toast-icon-pop {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.toast-icon-pop {
+  animation: toast-icon-pop 350ms cubic-bezier(0.22, 1, 0.36, 1) 80ms both;
+}
+
+/* ── Toast icon error shake ── */
+@keyframes toast-icon-shake {
+  0%, 100% { transform: translateX(0); }
+  15%, 55% { transform: translateX(-2px); }
+  35%, 75% { transform: translateX(2px); }
+}
+
+.toast-icon-shake {
+  animation: toast-icon-shake 400ms ease 80ms;
+}
+
+/* ── Settings tab content entrance ── */
+@keyframes settings-content-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.settings-content-enter {
+  animation: settings-content-enter 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Audio level gradient (green → yellow → red) ── */
+.audio-level-gradient {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--success)) 0%,
+    hsl(var(--success)) 55%,
+    hsl(var(--warning)) 78%,
+    hsl(var(--destructive)) 96%
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   OVERDRIVE: Dashboard page-load choreography + interactions
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Staggered entrance: fade-in + slide from direction ── */
+@keyframes dash-enter-down {
+  0% { opacity: 0; transform: translateY(-12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes dash-enter-left {
+  0% { opacity: 0; transform: translateX(-20px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes dash-enter-up {
+  0% { opacity: 0; transform: translateY(16px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes dash-enter-scale {
+  0% { opacity: 0; transform: scale(0.92); }
+  60% { opacity: 1; transform: scale(1.03); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Page-load sequence — each element animates in with a stagger offset */
+.dash-header {
+  animation: dash-enter-down 400ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.dash-sidebar {
+  animation: dash-enter-left 450ms cubic-bezier(0.22, 1, 0.36, 1) 60ms both;
+}
+
+.dash-main {
+  animation: dash-enter-up 450ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both;
+}
+
+.dash-footer {
+  animation: dash-enter-up 350ms cubic-bezier(0.22, 1, 0.36, 1) 250ms both;
+}
+
+/* ── Start button: entrance + ambient glow pulse ── */
+.dash-start-btn {
+  animation: dash-enter-scale 500ms cubic-bezier(0.22, 1, 0.36, 1) 200ms both;
+}
+
+@keyframes start-btn-glow {
+  0%, 100% { box-shadow: 0 4px 15px -3px hsl(var(--primary) / 0.2), 0 0 0 0 hsl(var(--primary) / 0); }
+  50% { box-shadow: 0 4px 20px -2px hsl(var(--primary) / 0.3), 0 0 0 6px hsl(var(--primary) / 0.04); }
+}
+
+.start-btn-glow {
+  animation: start-btn-glow 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  animation-delay: 800ms; /* Start after entrance completes */
+}
+
+/* ── Meeting card: staggered entrance ── */
+@keyframes card-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.meeting-card-enter {
+  animation: card-enter 350ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Meeting card: spring hover lift + press ── */
+.meeting-card-interactive {
+  transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 200ms cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 150ms ease-out;
+}
+
+.meeting-card-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px -6px hsl(var(--foreground) / 0.08),
+              0 2px 6px -2px hsl(var(--foreground) / 0.04);
+}
+
+.meeting-card-interactive:active {
+  transform: translateY(0px) scale(0.985);
+  box-shadow: 0 1px 3px -1px hsl(var(--foreground) / 0.06);
+  transition-duration: 80ms;
+}
+
+/* ── LIVE pill: enhanced ring pulse ── */
+@keyframes live-ring-pulse {
+  0% { box-shadow: 0 0 0 0 hsl(var(--success) / 0.25); }
+  70% { box-shadow: 0 0 0 6px hsl(var(--success) / 0); }
+  100% { box-shadow: 0 0 0 0 hsl(var(--success) / 0); }
+}
+
+.live-ring-pulse {
+  animation: live-ring-pulse 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* ── Section label entrance ── */
+.dash-section-enter {
+  animation: dash-enter-up 350ms cubic-bezier(0.22, 1, 0.36, 1) 280ms both;
+}
+
+/* Ensure select/option elements use theme colors */
+select option {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+/* ── AI panel: scope picker, progress, history (spring decel, no overshoot) ── */
+@keyframes scope-pop-enter {
+  0% { opacity: 0; transform: translateY(-4px) scale(0.97); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.scope-pop-enter {
+  animation: scope-pop-enter 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: top right;
+}
+
+/* Meeting-detection prompt sliding in from the top of the screen */
+@keyframes meeting-prompt-enter {
+  0% { opacity: 0; transform: translateY(-10px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.meeting-prompt-enter {
+  animation: meeting-prompt-enter 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .meeting-prompt-enter { animation: none; }
+}
+
+/* A phase change in the progress line */
+@keyframes progress-phase-enter {
+  0% { opacity: 0; transform: translateY(3px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.progress-phase-enter {
+  animation: progress-phase-enter 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Waiting on the model: the status dot breathes */
+@keyframes progress-breathe {
+  0%, 100% { opacity: 0.35; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1); }
+}
+.progress-breathe {
+  animation: progress-breathe 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+@keyframes history-slide-enter {
+  0% { opacity: 0; transform: translateX(12px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+.history-slide-enter {
+  animation: history-slide-enter 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Focus ring for keyboard navigation */
+:focus-visible {
+  outline: 2px solid hsl(var(--ring) / 0.7);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Respect reduced motion preferences (WCAG 2.3.3) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Settings sidebar nav item */
+.settings-nav-item {
+  @apply flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150;
+}
+
+.settings-nav-item.active {
+  @apply bg-primary/10 text-primary;
+}
+
+.settings-nav-item:not(.active) {
+  @apply text-muted-foreground hover:bg-accent hover:text-foreground;
+}
+
+/* Smooth toggle switch */
+.toggle-switch {
+  @apply relative h-6 w-11 cursor-pointer rounded-full transition-colors duration-200;
+}
+
+.toggle-switch::after {
+  content: '';
+  @apply absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200;
+}
+
+.toggle-switch[data-checked="true"] {
+  @apply bg-primary;
+}
+
+.toggle-switch[data-checked="true"]::after {
+  transform: translateX(1.25rem);
+}
+
+.toggle-switch[data-checked="false"] {
+  @apply bg-muted;
+}

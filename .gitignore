@@ -1,0 +1,75 @@
+# Dependencies
+node_modules/
+target/
+
+# Build output
+dist/
+.astro/
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+# Database
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Tauri
+src-tauri/target/
+src-tauri/gen/
+src-tauri/ort/
+WixTools/
+
+# Tauri updater signing key
+src-tauri/.tauri-private-key
+
+# Recordings
+recordings/
+
+# Superpowers
+.superpowers/
+
+# Claude Code
+CLAUDE.md
+.claude/
+docs/development
+docs/superpowers
+
+# Logs
+*.log
+npm-debug.log*
+
+# Package manager locks (keep package-lock.json, ignore others)
+yarn.lock
+pnpm-lock.yaml
+bun.lockb
+
+# Generated portable Python and local inference dependencies.
+/runtime/
+
+# Local development artifacts
+/test-temp/
+/test-temp-stt/
+/model-test-temp/
+/.playwright-mcp/
+/.planning/
+__pycache__/
+*.py[cod]

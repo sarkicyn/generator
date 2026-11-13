@@ -1,0 +1,109 @@
+[package]
+name = "nexq"
+version = "2.28.0"
+description = "AI Meeting Assistant & Real-Time Interview Copilot"
+authors = ["NexQ"]
+edition = "2021"
+
+[features]
+default = ["custom-russian"]
+# Keep the customized interface from being overwritten by upstream installers.
+custom-russian = []
+
+[lib]
+name = "nexq_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["macos-private-api", "tray-icon", "protocol-asset"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-os = "2"
+tauri-plugin-process = "2"
+tauri-plugin-shell = "2"
+tauri-plugin-store = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+rusqlite = { version = "0.31", features = ["bundled"] }
+reqwest = { version = "0.12", features = ["json", "stream", "multipart"] }
+async-trait = "0.1"
+futures = "0.3"
+anyhow = "1"
+thiserror = "1"
+log = "0.4"
+hound = "3.5"
+pdf-extract = "0.12"
+lopdf = "0.42"
+tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
+url = "2"
+base64 = "0.22"
+whisper-rs = "0.16"
+sha2 = "0.10"
+zip = "2"
+# load-dynamic: onnxruntime.dll is bundled and loaded on first use (see src/ort_runtime.rs)
+ort = { version = "=2.0.0-rc.12", default-features = false, features = ["std", "ndarray", "tracing", "api-24", "load-dynamic"] }
+ndarray = "0.17"  # Must match ort's ndarray version
+rustfft = "6"
+tokenizers = { version = "0.23", default-features = false, features = ["onig"] }
+tar = "0.4"
+bzip2 = "0.5"
+ogg = "0.9"
+libopus_sys = { version = "0.4", features = ["static", "bundled"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+encoding_rs = "0.8"
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+cpal = "0.15"
+
+# Windows-specific
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Security_Credentials",
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_WindowsAndMessaging",
+    "Media_SpeechRecognition",
+    "Media_Core",
+    "Foundation",
+    "Foundation_Collections",
+    "Storage_Streams",
+    "Globalization",
+    # SAPI 5.x for Windows Native STT (supports custom audio streams)
+    "Win32_Media_Speech",
+    # COM initialization for SAPI thread
+    "Win32_System_Com",
+    # Audio session enumeration + peak meters (IAudioMeterInformation)
+    "Win32_Media_Audio",
+    "Win32_Media_Audio_Endpoints",
+    # Process info for session monitor
+    "Win32_System_Threading",
+    # Device property store (friendly names)
+    "Win32_UI_Shell_PropertiesSystem",
+    # Window subclassing (stealth mode follows window visibility)
+    "Win32_UI_Shell",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Variant",
+    "Win32_System_LibraryLoader",
+] }
+wasapi = "0.22"
+
+# macOS-specific
+[target.'cfg(target_os = "macos")'.dependencies]
+cpal = "0.16"
+# Used by src/commands/stealth_commands.rs to set the overlay NSWindow's
+# `sharingType` to NSWindowSharingNone (equivalent of Windows' WDA_EXCLUDEFROMCAPTURE).
+objc2 = "0.6"
+coreaudio-sys = "0.2"
+core-foundation = "0.10"
+# macOS Keychain credential backend (src/credentials/macos_keychain.rs).
+security-framework = "3"

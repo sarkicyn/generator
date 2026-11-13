@@ -1,0 +1,91 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "NexQ",
+  "version": "2.28.0",
+  "identifier": "com.nexq.app",
+  "build": {
+    "beforeDevCommand": "node scripts/fetch-onnxruntime.mjs && npm run dev",
+    "devUrl": "http://localhost:5173",
+    "beforeBuildCommand": "node scripts/fetch-onnxruntime.mjs && node scripts/prepare-faster-whisper.mjs && npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "label": "launcher",
+        "title": "NexQ",
+        "width": 900,
+        "height": 650,
+        "minWidth": 700,
+        "minHeight": 500,
+        "resizable": true,
+        "center": true,
+        "decorations": true,
+        "visible": false
+      },
+      {
+        "label": "overlay",
+        "title": "NexQ Overlay",
+        "width": 844,
+        "height": 633,
+        "minWidth": 400,
+        "minHeight": 480,
+        "resizable": true,
+        "decorations": false,
+        "alwaysOnTop": false,
+        "visible": false,
+        "transparent": true,
+        "shadow": false,
+        "x": 50,
+        "y": 50
+      }
+    ],
+    "trayIcon": {
+      "id": "main",
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": false,
+      "tooltip": "NexQ — AI Meeting Assistant",
+      "menuOnLeftClick": false
+    },
+    "security": {
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$APPDATA/recordings/**"]
+      }
+    }
+  },
+  "bundle": {
+    "resources": { "../runtime/faster-whisper/": "runtime/faster-whisper/" },
+    "active": true,
+    "targets": ["nsis"],
+    "createUpdaterArtifacts": false,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "displayLanguageSelector": false,
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico",
+        "headerImage": "nsis-header.bmp",
+        "sidebarImage": "nsis-sidebar.bmp",
+        "installerHooks": "./nsis-hooks.nsh"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDMzM0VGQzk0QTQwN0UyOUEKUldTYTRnZWtsUHcrTXcxenlTdlRkZGVtWEgwVUZlMmZxOWRzNktwWGZFeWxCVGY5R2Jycml2bFIK",
+      "endpoints": [
+        "https://github.com/naxhq/NexQ/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}

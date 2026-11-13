@@ -1,0 +1,481 @@
+pub mod anthropic;
+pub mod cli_agent;
+pub mod custom;
+pub mod image_input;
+pub mod gemini;
+pub mod gemini_cache;
+pub mod ollama;
+pub mod openai_compat;
+pub mod openrouter_models;
+pub mod provider;
+pub mod stream_parser;
+
+use provider::{LLMError, LLMProvider};
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use tokio::sync::Mutex as TokioMutex;
+
+/// Provider type enum matching the frontend LLMProviderType
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ProviderType {
+    Ollama,
+    LmStudio,
+    Openai,
+    Anthropic,
+    Groq,
+    Gemini,
+    Openrouter,
+    Custom,
+    /// The local Claude Code CLI on the user's own subscription login.
+    ClaudeCli,
+}
+
+impl ProviderType {
+    pub fn from_str(s: &str) -> Result<Self, LLMError> {
+        match s {
+            "ollama" => Ok(Self::Ollama),
+            "lm_studio" => Ok(Self::LmStudio),
+            "openai" => Ok(Self::Openai),
+            "anthropic" => Ok(Self::Anthropic),
+            "groq" => Ok(Self::Groq),
+            "gemini" => Ok(Self::Gemini),
+            "openrouter" => Ok(Self::Openrouter),
+            "custom" => Ok(Self::Custom),
+            "claude_cli" => Ok(Self::ClaudeCli),
+            _ => Err(LLMError::NotConfigured(format!(
+                "Unknown provider type: {}",
+                s
+            ))),
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Ollama => "ollama",
+            Self::LmStudio => "lm_studio",
+            Self::Openai => "openai",
+            Self::Anthropic => "anthropic",
+            Self::Groq => "groq",
+            Self::Gemini => "gemini",
+            Self::Openrouter => "openrouter",
+            Self::Custom => "custom",
+            Self::ClaudeCli => "claude_cli",
+        }
+    }
+
+    pub fn display_name(&self) -> &str {
+        match self {
+            Self::Ollama => "Ollama",
+            Self::LmStudio => "LM Studio",
+            Self::Openai => "OpenAI",
+            Self::Anthropic => "Anthropic",
+            Self::Groq => "Groq",
+            Self::Gemini => "Google Gemini",
+            Self::Openrouter => "OpenRouter",
+            Self::Custom => "Custom",
+            Self::ClaudeCli => "Claude (subscription)",
+        }
+    }
+
+    pub fn default_base_url(&self) -> &str {
+        match self {
+            Self::Ollama => "http://localhost:11434",
+            Self::LmStudio => "http://localhost:1234/v1",
+            Self::Openai => "https://api.openai.com/v1",
+            Self::Anthropic => "https://api.anthropic.com",
+            Self::Groq => "https://api.groq.com/openai/v1",
+            Self::Gemini => "https://generativelanguage.googleapis.com",
+            Self::Openrouter => "https://openrouter.ai/api/v1",
+            Self::Custom | Self::ClaudeCli => "",
+        }
+    }
+
+    pub fn requires_api_key(&self) -> bool {
+        matches!(
+            self,
+            Self::Openai | Self::Anthropic | Self::Groq | Self::Gemini | Self::Openrouter
+        )
+    }
+
+    pub fn is_local(&self) -> bool {
+        matches!(self, Self::Ollama | Self::LmStudio | Self::ClaudeCli)
+    }
+}
+
+/// Provider configuration used when switching providers
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProviderConfig {
+    pub provider_type: String,
+    pub api_key: Option<String>,
+    pub base_url: Option<String>,
+    pub auth_type: Option<String>,
+    pub auth_value: Option<String>,
+    pub auth_header: Option<String>,
+}
+
+/// Provider info returned to the frontend
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProviderInfo {
+    #[serde(rename = "type")]
+    pub provider_type: String,
+    pub name: String,
+    pub base_url: String,
+    pub requires_api_key: bool,
+    pub is_local: bool,
+}
+
+/// Build a provider client from a config without touching any router state.
+/// Used for the active provider (`LLMRouter::set_provider`) and for temporary
+/// providers (browsing models, connection tests, fallback).
+pub fn create_provider(config: &ProviderConfig) -> Result<Box<dyn LLMProvider>, String> {
+    let provider_type = ProviderType::from_str(&config.provider_type).map_err(|e| match e {
+        LLMError::NotConfigured(msg) => msg,
+        other => other.to_string(),
+    })?;
+
+    let provider: Box<dyn LLMProvider> = match provider_type {
+        ProviderType::Ollama => Box::new(ollama::OllamaClient::new(config.base_url.as_deref())),
+        ProviderType::LmStudio => Box::new(openai_compat::create_lm_studio_client(
+            config.base_url.as_deref(),
+        )),
+        ProviderType::Openai => {
+            let api_key = config
+                .api_key
+                .as_deref()
+                .ok_or_else(|| "OpenAI API key required".to_string())?;
+            Box::new(openai_compat::create_openai_client(api_key))
+        }
+        ProviderType::Anthropic => {
+            let api_key = config
+                .api_key
+                .as_deref()
+                .ok_or_else(|| "Anthropic API key required".to_string())?;
+            Box::new(anthropic::AnthropicClient::new(
+                api_key,
+                config.base_url.as_deref(),
+            ))
+        }
+        ProviderType::Groq => {
+            let api_key = config
+                .api_key
+                .as_deref()
+                .ok_or_else(|| "Groq API key required".to_string())?;
+            Box::new(openai_compat::create_groq_client(api_key))
+        }
+        ProviderType::Gemini => {
+            let api_key = config
+                .api_key
+                .as_deref()
+                .ok_or_else(|| "Gemini API key required".to_string())?;
+            Box::new(gemini::GeminiClient::new(api_key, config.base_url.as_deref()))
+        }
+        ProviderType::Openrouter => {
+            let api_key = config
+                .api_key
+                .as_deref()
+                .ok_or_else(|| "OpenRouter API key required".to_string())?;
+            Box::new(openai_compat::create_openrouter_client(api_key))
+        }
+        ProviderType::Custom => {
+            let base_url = config
+                .base_url
+                .clone()
+                .ok_or_else(|| "Custom endpoint base URL required".to_string())?;
+            let auth_type = match config.auth_type.as_deref() {
+                Some("bearer") => custom::CustomAuthType::Bearer,
+                Some("api_key") | Some("api-key") => custom::CustomAuthType::ApiKey,
+                _ => custom::CustomAuthType::None,
+            };
+            Box::new(custom::CustomClient::new(custom::CustomConfig {
+                base_url,
+                auth_type,
+                auth_value: config.auth_value.clone(),
+                auth_header: config.auth_header.clone(),
+            }))
+        }
+        // Needs no config: it reaches the session manager through the
+        // `AppHandle` passed to every `stream_completion` call.
+        ProviderType::ClaudeCli => Box::new(cli_agent::provider::ClaudeCliProvider::new()),
+    };
+
+    Ok(provider)
+}
+
+/// Routes to active LLM provider, supports hot-switching and cancellation.
+pub struct LLMRouter {
+    active_config: Option<ProviderConfig>,
+    active_provider: Option<Arc<TokioMutex<Box<dyn LLMProvider>>>>,
+    active_model: String,
+    active_provider_type: Option<ProviderType>,
+    cancel_token: Arc<TokioMutex<bool>>,
+}
+
+impl LLMRouter {
+    pub fn new() -> Self {
+        Self {
+            active_config: None,
+            active_provider: None,
+            active_model: String::new(),
+            active_provider_type: None,
+            cancel_token: Arc::new(TokioMutex::new(false)),
+        }
+    }
+
+    /// Set the active provider, creating the appropriate client.
+    pub fn set_provider(
+        &mut self,
+        config: ProviderConfig,
+    ) -> Result<(), LLMError> {
+        let provider_type = ProviderType::from_str(&config.provider_type)?;
+        let provider = create_provider(&config).map_err(LLMError::NotConfigured)?;
+
+        if self.active_provider_type.as_ref() != Some(&provider_type) {
+            self.active_model.clear();
+        }
+        self.active_provider = Some(Arc::new(TokioMutex::new(provider)));
+        self.active_config = Some(config);
+        self.active_provider_type = Some(provider_type);
+        Ok(())
+    }
+
+    /// Get a reference to the active provider (behind a tokio mutex for async access).
+    pub fn get_provider(&self) -> Result<Arc<TokioMutex<Box<dyn LLMProvider>>>, LLMError> {
+        self.active_provider
+            .clone()
+            .ok_or_else(|| LLMError::NotConfigured("No LLM provider configured".to_string()))
+    }
+
+    /// Get the active model name.
+    pub fn active_model(&self) -> &str {
+        &self.active_model
+    }
+
+    /// A private client, with no shared stream mutex or conversation session.
+    pub fn independent_provider(&self) -> Result<(Box<dyn LLMProvider>, String, String), String> {
+        let config = self.active_config.as_ref().ok_or("Сначала подключите модель")?;
+        if config.provider_type == "claude_cli" {
+            return Err("Для параллельной оценки выберите модель с API или локальный HTTP-провайдер".into());
+        }
+        if self.active_model.trim().is_empty() { return Err("Сначала выберите модель".into()); }
+        Ok((create_provider(config)?, self.active_model.clone(), config.provider_type.clone()))
+    }
+
+    /// Set the active model.
+    pub fn set_active_model(&mut self, model: String) {
+        self.active_model = model;
+    }
+
+    /// Get the active provider type.
+    pub fn active_provider_type(&self) -> Option<&ProviderType> {
+        self.active_provider_type.as_ref()
+    }
+
+    /// Update the provider and its model under the caller's single router lock.
+    /// Validate before touching the active selection so a failed update is atomic.
+    pub fn activate_selection(
+        &mut self,
+        config: ProviderConfig,
+        model: Option<String>,
+    ) -> Result<(), LLMError> {
+        let model = model.map(|m| m.trim().to_string());
+        if model.as_deref() == Some("") {
+            return Err(LLMError::NotConfigured("Выберите модель".into()));
+        }
+        self.set_provider(config)?;
+        if let Some(model) = model {
+            self.set_active_model(model);
+        }
+        Ok(())
+    }
+
+    /// Reject late model-only requests belonging to a provider already replaced.
+    pub fn set_model_for_provider(&mut self, provider: &str, model: String) -> Result<(), String> {
+        if self.active_provider_type().map(ProviderType::as_str) != Some(provider) {
+            return Err("Провайдер изменился. Выберите модель повторно".into());
+        }
+        let model = model.trim();
+        if model.is_empty() {
+            return Err("Выберите модель".into());
+        }
+        self.set_active_model(model.to_string());
+        Ok(())
+    }
+
+    /// A delayed local discovery must never replace a user's newer selection.
+    pub fn apply_autodetected_model(
+        &mut self,
+        expected_provider: &Arc<TokioMutex<Box<dyn LLMProvider>>>,
+        model: String,
+    ) -> bool {
+        let same_provider = self.active_provider.as_ref()
+            .map(|current| Arc::ptr_eq(current, expected_provider))
+            .unwrap_or(false);
+        if self.active_provider_type() != Some(&ProviderType::Ollama)
+            || !self.active_model.is_empty() || !same_provider || model.trim().is_empty()
+        {
+            return false;
+        }
+        self.set_active_model(model);
+        true
+    }
+
+    /// Request cancellation of the current stream.
+    pub async fn cancel(&self) {
+        let mut cancel = self.cancel_token.lock().await;
+        *cancel = true;
+    }
+
+    /// Check if cancellation was requested and reset the flag.
+    pub async fn check_cancelled(&self) -> bool {
+        let mut cancel = self.cancel_token.lock().await;
+        let was_cancelled = *cancel;
+        if was_cancelled {
+            *cancel = false;
+        }
+        was_cancelled
+    }
+
+    /// Get information about all available providers.
+    pub fn get_all_providers() -> Vec<ProviderInfo> {
+        let all_types = [
+            ProviderType::Ollama,
+            ProviderType::LmStudio,
+            ProviderType::Openai,
+            ProviderType::Anthropic,
+            ProviderType::Groq,
+            ProviderType::Gemini,
+            ProviderType::Openrouter,
+            ProviderType::Custom,
+            ProviderType::ClaudeCli,
+        ];
+
+        all_types
+            .iter()
+            .map(|pt| ProviderInfo {
+                provider_type: pt.as_str().to_string(),
+                name: pt.display_name().to_string(),
+                base_url: pt.default_base_url().to_string(),
+                requires_api_key: pt.requires_api_key(),
+                is_local: pt.is_local(),
+            })
+            .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn independent_evaluation_client_does_not_wait_for_the_foreground_provider_mutex() {
+        let mut router=LLMRouter::new();
+        router.activate_selection(ProviderConfig{provider_type:"custom".into(),api_key:None,base_url:Some("http://127.0.0.1:9/v1".into()),auth_type:None,auth_value:None,auth_header:None},Some("test-model".into())).unwrap();
+        let foreground=router.get_provider().unwrap();
+        let _busy=foreground.lock().await;
+        let (_independent,model,provider)=router.independent_provider().unwrap();
+        assert_eq!(model,"test-model"); assert_eq!(provider,"custom");
+        assert!(Arc::ptr_eq(&foreground,&router.get_provider().unwrap()));
+    }
+
+    fn cfg(provider_type: &str, api_key: Option<&str>, base_url: Option<&str>) -> ProviderConfig {
+        ProviderConfig {
+            provider_type: provider_type.to_string(),
+            api_key: api_key.map(String::from),
+            base_url: base_url.map(String::from),
+            auth_type: None,
+            auth_value: None,
+            auth_header: None,
+        }
+    }
+
+    #[test]
+    fn create_provider_does_not_touch_router() {
+        let mut router = LLMRouter::new();
+        router.set_provider(cfg("ollama", None, None)).unwrap();
+
+        let temp = create_provider(&cfg("openai", Some("sk-test"), None));
+        assert!(temp.is_ok());
+        assert_eq!(router.active_provider_type(), Some(&ProviderType::Ollama));
+
+        let err = create_provider(&cfg("custom", None, None)).err();
+        assert!(err.is_some(), "custom without base_url must fail");
+        assert_eq!(router.active_provider_type(), Some(&ProviderType::Ollama));
+    }
+
+    #[test]
+    fn provider_and_model_activate_together_and_failure_preserves_the_pair() {
+        let mut router = LLMRouter::new();
+        router.activate_selection(cfg("ollama", None, None), Some("local-model".into())).unwrap();
+        assert!(router.activate_selection(cfg("openai", None, None), Some("gpt-example".into())).is_err());
+        assert_eq!(router.active_provider_type(), Some(&ProviderType::Ollama));
+        assert_eq!(router.active_model(), "local-model");
+        assert!(router.activate_selection(cfg("openai", Some("sk-test"), None), Some("  ".into())).is_err());
+        assert_eq!(router.active_provider_type(), Some(&ProviderType::Ollama));
+        assert_eq!(router.active_model(), "local-model");
+        router.activate_selection(cfg("openai", Some("sk-test"), None), Some(" gpt-example ".into())).unwrap();
+        assert_eq!(router.active_provider_type(), Some(&ProviderType::Openai));
+        assert_eq!(router.active_model(), "gpt-example");
+    }
+
+    #[test]
+    fn stale_model_request_cannot_replace_a_different_providers_model() {
+        let mut router = LLMRouter::new();
+        router.activate_selection(cfg("openai", Some("sk-test"), None), Some("gpt-example".into())).unwrap();
+        assert!(router.set_model_for_provider("ollama", "local-model".into()).is_err());
+        assert_eq!(router.active_model(), "gpt-example");
+        router.set_model_for_provider("openai", "gpt-other".into()).unwrap();
+        assert_eq!(router.active_model(), "gpt-other");
+    }
+
+    #[test]
+    fn provider_only_switch_never_keeps_the_previous_providers_model() {
+        let mut router = LLMRouter::new();
+        router.activate_selection(cfg("ollama", None, None), Some("local-model".into())).unwrap();
+        router.set_provider(cfg("openai", Some("sk-test"), None)).unwrap();
+        assert!(router.active_model().is_empty());
+    }
+
+    #[test]
+    fn late_ollama_discovery_cannot_override_a_cloud_or_newer_local_selection() {
+        let mut router = LLMRouter::new();
+        router.set_provider(cfg("ollama", None, None)).unwrap();
+        let old_local = router.get_provider().unwrap();
+        router.activate_selection(cfg("openai", Some("sk-test"), None), Some("gpt-example".into())).unwrap();
+        assert!(!router.apply_autodetected_model(&old_local, "old-local-model".into()));
+        assert_eq!(router.active_model(), "gpt-example");
+        router.set_provider(cfg("ollama", None, None)).unwrap();
+        assert!(!router.apply_autodetected_model(&old_local, "old-local-model".into()));
+        assert!(router.active_model().is_empty());
+        let new_local = router.get_provider().unwrap();
+        assert!(router.apply_autodetected_model(&new_local, "discovered-model".into()));
+        assert!(!router.apply_autodetected_model(&new_local, "another-model".into()));
+        assert_eq!(router.active_model(), "discovered-model");
+    }
+
+    #[test]
+    fn claude_cli_provider_type_roundtrip() {
+        let pt = ProviderType::from_str("claude_cli").unwrap();
+        assert_eq!(pt, ProviderType::ClaudeCli);
+        assert_eq!(pt.as_str(), "claude_cli");
+        assert_eq!(ProviderType::from_str(pt.as_str()).unwrap(), pt);
+        assert_eq!(serde_json::to_string(&pt).unwrap(), "\"claude_cli\"");
+        assert_eq!(pt.display_name(), "Claude (subscription)");
+    }
+
+    #[test]
+    fn claude_cli_requires_no_key() {
+        assert!(!ProviderType::ClaudeCli.requires_api_key());
+        assert!(ProviderType::ClaudeCli.is_local());
+        assert!(create_provider(&cfg("claude_cli", None, None)).is_ok());
+        assert!(LLMRouter::get_all_providers()
+            .iter()
+            .any(|p| p.provider_type == "claude_cli" && !p.requires_api_key && p.is_local));
+    }
+
+    #[test]
+    fn create_provider_rejects_missing_key_and_unknown_type() {
+        assert!(create_provider(&cfg("openai", None, None)).is_err());
+        assert!(create_provider(&cfg("nope", None, None)).is_err());
+    }
+}

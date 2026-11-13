@@ -1,0 +1,29 @@
+# Build configuration for whisper-rs (requires CMake + libclang).
+#
+# Windows defaults: LLVM's libclang and the Ninja generator. Cargo's [env] never
+# overrides a variable that is already set, so macOS builds export their own
+# values first: `source scripts/macos-env.sh` (build-mac.sh and CI do this).
+[env]
+LIBCLANG_PATH = "C:\\Program Files\\LLVM\\bin"
+CMAKE_GENERATOR = "Ninja"
+
+# Portable CPU baseline for whisper.cpp/ggml (whisper-rs-sys forwards GGML_* to CMake).
+# ggml defaults to GGML_NATIVE=ON, which bakes the *build machine's* CPU features
+# (AVX2 on GitHub runners) into the binary, so local Whisper would fault with 0xC000001D
+# (illegal instruction) on CPUs / x64 emulators without it. (The #6 launch crash
+# itself came from the static ONNX Runtime build — see src/ort_runtime.rs.)
+# NOTE: whisper-rs-sys does not rerun its build script when these change; bump the
+# rust-cache key in .github/workflows/*.yml (or `cargo clean -p whisper-rs-sys`).
+GGML_NATIVE = "OFF"
+GGML_SSE42 = "ON"
+GGML_AVX = "OFF"
+GGML_AVX2 = "OFF"
+GGML_AVX_VNNI = "OFF"
+GGML_BMI2 = "OFF"
+GGML_FMA = "OFF"
+GGML_F16C = "OFF"
+GGML_AVX512 = "OFF"
+
+# Statically link the MSVC C runtime so users don't need VC++ Redistributable
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
